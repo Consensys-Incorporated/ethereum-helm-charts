@@ -1,9 +1,9 @@
 dependencies:
 - name: elc
   repository: ""
-  version: 0.0.3
+  version: 0.2.0
 - name: clc
   repository: ""
-  version: 0.0.3
-digest: sha256:05b8b92786d984706776811f82f51ce7ad2581882164b895d47ad87fe7a498c5
-generated: "2025-08-14T11:29:12.267538546+10:00"
+  version: 0.2.0
+digest: sha256:fd8b0b194bb3f4955d27ca1e757982e053c29669c2999b40d2fedf47b6ec8ba6
+generated: "2026-10-28T15:54:18.815547308+10:00"

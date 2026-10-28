@@ -2,8 +2,8 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
   release:
@@ -21,10 +21,59 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
-        with:
-          charts_dir: charts
-          skip_existing: true
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
+      # Every chart is released under the pushed tag, so each Chart.yaml version must match it.
+      - name: Check chart versions match the tag
         env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          TAG: ${{ github.ref_name }}
+        run: |
+          status=0
+          for chart in charts/*/; do
+            version=$(helm show chart "$chart" | sed -n 's/^version: *//p')
+            if [[ "$version" != "$TAG" ]]; then
+              echo "::error file=${chart}Chart.yaml::version $version does not match tag $TAG"
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Package charts
+        run: |
+          mkdir -p .packages
+          for chart in charts/*/; do
+            helm package "$chart" --destination .packages
+          done
+          ls -l .packages
+
+      # One release per tag with every chart attached; --clobber keeps re-runs safe.
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --verify-tag --generate-notes
+          gh release upload "$TAG" .packages/*.tgz --clobber
+
+      # Existing entries win on --merge, so a re-run for the same tag leaves the index unchanged.
+      - name: Update index.yaml on gh-pages
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git worktree add gh-pages origin/gh-pages
+          if [[ -f gh-pages/index.yaml ]]; then
+            merge=(--merge gh-pages/index.yaml)
+          fi
+          helm repo index .packages \
+            --url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG" \
+            "${merge[@]}"
+          cp .packages/index.yaml gh-pages/index.yaml
+          cd gh-pages
+          git add index.yaml
+          if git diff --cached --quiet; then
+            echo "index.yaml unchanged"
+          else
+            git commit -m "Release $TAG"
+            git push origin HEAD:gh-pages
+          fi

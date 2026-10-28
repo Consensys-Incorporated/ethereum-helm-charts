@@ -65,7 +65,7 @@ image:
     imagePullPolicy: Always
   hooks:
     repository: consensys/ethereum-k8s-hooks
-    tag: 1.36.0
+    tag: 1.37.1
     imagePullPolicy: Always
 
 storage:

@@ -46,6 +46,22 @@ examples/
 helm install [RELEASE_NAME] oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
 ```
 
+### Install from the Helm repository
+
+The chart is published to a Helm repository on each release, so you can install it without cloning this repo:
+
+```bash
+helm repo add ethereum https://consensys-incorporated.github.io/ethereum-helm-charts
+helm repo update
+helm search repo ethereum
+```
+
+The commands below use the local `./charts/ethereum-helm-charts` path. To use the published chart instead, replace it with `ethereum/ethnode` and add `--version <x.y.z>` to pin a release. The `--values` files under [examples/](examples/) live in this repo, so you'll still need copies of them.
+
+### Release
+
+Bump `version` in [charts/ethereum-helm-charts/Chart.yaml](charts/ethereum-helm-charts/Chart.yaml), merge to `master`, then push a matching tag (e.g. `git tag 0.2.0 && git push origin 0.2.0`). The release workflow fails if the tag and chart version differ. It packages the chart, attaches it to a GitHub release and updates `index.yaml` on `gh-pages`.
+
 ### Render / test the charts
 
 Always pass the provider base first, then the client combo on top:
@@ -96,7 +112,7 @@ elc: besu
 clc: teku
 ```
 
-See the [protocols-eth-argocd](https://github.com/Consensys/protocols-eth-argocd) repo for the full ApplicationSet configuration.
+See the [protocols-eth-argocd](https://github.com/Consensys-Incorporated/protocols-eth-argocd) repo for the full ApplicationSet configuration.
 
 ## TODO
 - support for validators

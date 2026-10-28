@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       kubectl_version:
-        description: "kubectl version to bake in (e.g. 1.36.0)"
+        description: "kubectl version to bake in (e.g. 1.37.1)"
         required: false
-        default: "1.36.0"
+        default: "1.37.1"
 
 env:
   IMAGE_NAME: consensys/ethereum-k8s-hooks
@@ -14,10 +14,10 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    environment: dockerhub    
+    environment: dockerhub
     permissions:
       contents: read
-      id-token: write # required for keyless cosign signing
+      id-token: write # Docker Hub OIDC login and keyless cosign signing
 
     steps:
       - name: Checkout
@@ -29,13 +29,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4
+      # Build before logging in: the emulated arm64 build is slow and the OIDC token is
+      # short-lived, so only the push below runs on it.
+      - name: Build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          context: docker/k8s-hooks
+          platforms: linux/amd64,linux/arm64
+          push: false
+          build-args: |
+            KUBECTL_VERSION=${{ inputs.kubectl_version }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ inputs.kubectl_version }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Build and push
+      # Docker Hub OIDC: short-lived push token issued to the dockerhub environment, no stored password.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+          DOCKERHUB_OIDC_EXPIREIN: 600
+        with:
+          username: consensys
+
+      # Same inputs as the build step, so every layer comes from the builder cache.
+      - name: Push
         id: build-push
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1
         with:
