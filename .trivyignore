@@ -1,0 +1,4 @@
+# KSV-0009 (hostNetwork): the Besu and Teku pods run on the host network on purpose. The init
+# container looks up the node's public IP, and the clients advertise it for P2P (--p2p-host /
+# --p2p-advertised-ip), so peers must reach the node's own ports directly.
+KSV-0009
