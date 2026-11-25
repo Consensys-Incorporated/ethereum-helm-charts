@@ -32,6 +32,9 @@ spec:
       automountServiceAccountToken: {{ .Values.serviceAccount.autoMount }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       {{- with .Values.affinity }}
       affinity: {{ toYaml . | nindent 8 }}
       {{- end }}
@@ -57,7 +60,12 @@ spec:
           - name: clc-data
             mountPath: {{ .Values.settings.dataPath }}
         securityContext:
-          runAsUser: 0                        
+          runAsUser: 0 # chowns the data volume for the client
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+            add: ["CHOWN", "DAC_OVERRIDE", "FOWNER"]
         command:
         - /bin/bash
         - -xec
@@ -74,6 +82,14 @@ spec:
       - name: teku
         image: {{ .Values.image.clc.repository }}:{{ .Values.image.clc.tag }}
         imagePullPolicy: {{ .Values.image.clc.imagePullPolicy }}
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true # /tmp is an emptyDir, for the node key and JNA
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         resources:
           requests:
             cpu: "{{ .Values.resources.cpuRequest }}"
@@ -99,6 +115,8 @@ spec:
           - name: clc-pip
             mountPath: /pip
             readOnly: true
+          - name: clc-tmp
+            mountPath: /tmp
           - name: teku-config-yml
             mountPath: /etc/teku
             readOnly: true
@@ -179,6 +197,8 @@ spec:
         secret:
           secretName: {{ include "ethnode.resourceName" . }}-jwt         
       - name: clc-pip
+        emptyDir: {}
+      - name: clc-tmp
         emptyDir: {}
       - name: clc-data
         persistentVolumeClaim:
